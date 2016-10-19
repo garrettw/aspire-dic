@@ -53,6 +53,8 @@ class Config
             $rule = \array_merge_recursive($this->getRule($rule['instanceOf']), $rule);
         }
         $this->rules[self::normalizeName($id)] = \array_merge_recursive($this->getRule($id), $rule);
+
+        return $this;
     }
 
     /**

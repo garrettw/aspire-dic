@@ -21,9 +21,17 @@ class Container implements \Interop\Container\ContainerInterface
         $this->config = $config;
     }
 
+    public function &config()
+    {
+        return $this->config;
+    }
+
     public function has($id)
     {
-        return (class_exists($id) || $this->config->getRule($id) != $this->config->getRule('*'));
+        return (class_exists($id)
+            || ($this->hasConfig()
+                && $this->config->getRule($id) != $this->config->getRule('*'))
+        );
     }
 
     public function hasConfig()
@@ -63,12 +71,12 @@ class Container implements \Interop\Container\ContainerInterface
     {
         // we either need a new instance or just don't have one stored
         // but if we have the closure stored that creates it, call that
-        if (!empty($this->closures[$classname])) {
-            return $this->closures[$classname]($args, $share);
+        if (!empty($this->closures[$id])) {
+            return $this->closures[$id]($args, $share);
         }
 
-        $rule = $this->config->getRule($id);
-        $class = new \ReflectionClass(isset($rule['instanceOf']) ? $rule['instanceOf'] : $classname);
+        $rule = ($this->hasConfig()) ? $this->config->getRule($id) : [];
+        $class = new \ReflectionClass(isset($rule['instanceOf']) ? $rule['instanceOf'] : $id);
 
         $closure = $this->prepare($id, $rule, $class);
 
@@ -112,27 +120,29 @@ class Container implements \Interop\Container\ContainerInterface
 
         // Get a closure based on the type of object being created: shared, normal, or constructorless
         if (isset($rule['shared']) && $rule['shared'] === true) {
-            return function(array $args, array $share) use ($name, $class, $constructor, $params) {
+            return function(array $args, array $share) use ($id, $class, $constructor, $params) {
                 // Shared instance: create without calling constructor (and write to \$name and $name, see issue #68)
-                $this->instances[$name] = $class->newInstanceWithoutConstructor();
+                $this->instances[$id] = $class->newInstanceWithoutConstructor();
 
                 // Now call constructor after constructing all dependencies. Avoids problems with cyclic references (issue #7)
                 if ($constructor) {
-                    $constructor->invokeArgs($this->instances[$name], $params($args, $share));
+                    $constructor->invokeArgs($this->instances[$id], $params($args, $share));
                 }
-                $this->instances[\ltrim($name, '\\')] = $this->instances[$name];
-                return $this->instances[$name];
+                $this->instances[\ltrim($id, '\\')] = $this->instances[$id];
+                return $this->instances[$id];
             };
         }
         if ($params) {
             // This class has dependencies, call the $params closure to generate them based on $args and $share
             return function(array $args, array $share) use ($class, $params) {
-                return $class->name(...$params($args, $share));
+                $cn = $class->name;
+                return new $cn(...$params($args, $share));
             };
         }
         return function() use ($class) {
             // No constructor arguments, just instantiate the class
-            return new $class->name();
+            $cn = $class->name;
+            return new $cn();
         };
     }
 
