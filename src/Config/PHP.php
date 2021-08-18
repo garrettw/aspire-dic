@@ -15,9 +15,9 @@ class PHP implements Format
 
     public function load()
     {
-        $data = include $path;
+        $data = include $this->path;
         if (!\is_array($data)) {
-            throw new ContainerException('Not a valid config file: ' . $path);
+            throw new ContainerException('Not a valid config file: ' . $this->path);
         }
         return $data;
     }
