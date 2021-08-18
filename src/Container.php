@@ -10,7 +10,7 @@
 
 namespace Aspire\DIC;
 
-class Container implements \Interop\Container\ContainerInterface
+class Container implements \Psr\Container\ContainerInterface
 {
     private $config = null;
     private $closures = [];
