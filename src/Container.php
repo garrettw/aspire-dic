@@ -21,12 +21,26 @@ class Container implements \Psr\Container\ContainerInterface
         $this->config = $config;
     }
 
-    public function &config()
+    /**
+     * Provides a way to get at the Config object after container creation,
+     * in case you didn't save it to a variable before instantiating the container.
+     * The use case for this is when rules need to be adjusted later in execution.
+     *
+     * @return Config
+     */
+    public function config(): Config
     {
         return $this->config;
     }
 
-    public function has($id)
+    /**
+     * This is a function defined by the PSR interface where we can check if
+     * a given object can theoretically be provided by the container or not.
+     *
+     * @param string $id
+     * @return bool
+     */
+    public function has(string $id): bool
     {
         return (class_exists($id)
             || ($this->hasConfig()
@@ -34,21 +48,33 @@ class Container implements \Psr\Container\ContainerInterface
         );
     }
 
-    public function hasConfig()
+    /**
+     * Answers the question "do we have a configuration object?"
+     *
+     * @return bool
+     */
+    public function hasConfig(): bool
     {
         return isset($this->config);
     }
 
     /**
+     * This is the main object creation method you would call, and it is named
+     * "get()" to align with the PSR interface.
      * Returns a fully constructed object based on $id, whether one exists already or not
+     * @todo method signature does not match PSR. $args will have to be supplied some other way.
      *
      * @param string $id
-     * @return mixed
+     * @throws Exception\NotFoundException if there's no way create the desired object
+     * @throws Exception\ContainerException if instantiation fails for some other reason
+     * @return object
      */
-    public function get($id, array $args = [])
+    public function get(string $id, array $args = []): object
     {
         if (!$this->has($id)) {
-            throw new Exception\NotFoundException('Could not instantiate ' . $id);
+            throw new Exception\NotFoundException(
+                "Could not instantiate $id: class/rule not found"
+            );
         }
 
         if (empty($args) && !empty($this->instances[$id])) {
@@ -56,7 +82,12 @@ class Container implements \Psr\Container\ContainerInterface
             return $this->instances[$id];
         }
 
-        return $this->make($id, $args);
+        try {
+            return $this->make($id, $args);
+        } catch (\Exception $e) {
+            // we just want the exception to be our brand
+            throw new Exception\ContainerException($e->getMessage(), $e->getCode(), $e);
+        }
     }
 
     /**
@@ -214,7 +245,7 @@ class Container implements \Psr\Container\ContainerInterface
 
     /**
      * Looks for 'instance' array keys in $param, and when found, returns an object based on the value.
-     * See {@link https:// r.je/dice.html#example3-1}
+     * See {@link https://r.je/dice.html#example3-1}
      *
      * @param string|array $param
      * @param array $share Whether this class instance will be passed around each time
