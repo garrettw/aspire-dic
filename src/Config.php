@@ -4,6 +4,12 @@ namespace Aspire\DIC;
 
 class Config
 {
+    const CONSTANT = '::CONSTANT';
+    const GLOBAL = '::GLOBAL';
+    const INSTANCE = '::INSTANCE';
+    const CHAIN_CALL = '::CHAIN_CALL';
+    const SELF = '::SELF';
+
     /**
      * @var array $rules Rules which have been set using addRule() or load()
      */
@@ -19,21 +25,24 @@ class Config
     public function load(Config\Format $format)
     {
         $data = $format->load();
+        $config = $this;
 
         if (isset($data['rules'])) {
             foreach ($data['rules'] as $rule) {
                 $name = $rule['name'];
                 unset($rule['name']);
-                $this->addRule($name, $rule);
+                $config = $config->addRule($name, $rule);
             }
-            return $this;
+            return $config;
         }
 
         foreach ($data as $name => $rule) {
-            $this->addRule($name, $rule);
+            $config = $config->addRule($name, $rule);
         }
-        return $this;
+        return $config;
     }
+
+    // TODO: only clone instance once when adding multiple rules
 
     /**
      * Adds a rule $rule to the class $classname.
@@ -44,7 +53,7 @@ class Config
      * @param string $id The name of the class to add the rule for
      * @param array $rule The rule to add to it
      */
-    public function addRule($id, $rule)
+    public function addRule(string $id, $rule)
     {
         if (isset($rule['instanceOf'])
             && \is_string($rule['instanceOf'])
@@ -52,9 +61,18 @@ class Config
         ) {
             $rule = \array_merge_recursive($this->getRule($rule['instanceOf']), $rule);
         }
-        $this->rules[self::normalizeName($id)] = \array_merge_recursive($this->getRule($id), $rule);
 
-        return $this;
+        // Allow substitutions rules to be defined with a leading slash
+        if (isset($rule['substitutions'])) {
+            foreach($rule['substitutions'] as $key => $value) {
+                $rule['substitutions'][ltrim($key, '\\')] = $value;
+            }
+        }
+
+        $config = clone $this;
+        $config->rules[self::normalizeName($id)] = \array_merge_recursive($config->getRule($id), $rule);
+
+        return $config;
     }
 
     /**
@@ -63,7 +81,7 @@ class Config
      * @param string $id The name of the ruleset to get - can be a class or not
      * @return array Ruleset that applies when instantiating the given name
      */
-    public function getRule($id)
+    public function getRule(string $id)
     {
         // first, check for exact match
         $normalname = self::normalizeName($id);
@@ -87,7 +105,7 @@ class Config
     /**
      * @param string $name
      */
-    private static function normalizeName($name)
+    private static function normalizeName(string $name)
     {
         return \strtolower(\ltrim($name, '\\'));
     }
