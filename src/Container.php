@@ -42,7 +42,7 @@ class Container implements \Psr\Container\ContainerInterface
      */
     public function has(string $id): bool
     {
-        return (class_exists($id)
+        return (\class_exists($id)
             || ($this->hasConfig()
                 && $this->config->getRule($id) != $this->config->getRule('*'))
         );
@@ -109,7 +109,7 @@ class Container implements \Psr\Container\ContainerInterface
         $rule = ($this->hasConfig()) ? $this->config->getRule($id) : [];
         $class = new \ReflectionClass(isset($rule['instanceOf']) ? $rule['instanceOf'] : $id);
 
-        $closure = $this->prepare(ltrim($id, '\\'), $rule, $class);
+        $closure = $this->prepare(\ltrim($id, '\\'), $rule, $class);
 
         if (isset($rule['shareInstances'])) {
             $closure = function(array $args, array $share) use ($closure, $rule) {
@@ -138,12 +138,12 @@ class Container implements \Psr\Container\ContainerInterface
                             if (!empty($rule['shared'])) {
                                 $this->instances[$id] = $return;
                             }
-                            if (is_object($return)) {
-                                $class = new \ReflectionClass(get_class($return));
+                            if (\is_object($return)) {
+                                $class = new \ReflectionClass(\get_class($return));
                             }
                             $object = $return;
-                        } elseif (is_callable($call[2])) {
-                            call_user_func($call[2], $return);
+                        } elseif (\is_callable($call[2])) {
+                            \call_user_func($call[2], $return);
                         }
                     }
                 }
@@ -246,7 +246,7 @@ class Container implements \Psr\Container\ContainerInterface
                         // TODO: above and then https://github.com/Level-2/Dice/commit/8cd036faa9d3bc3c2dffa56aff08e978e2985bb5
                         // For variadic parameters, provide remaining $args
                         if ($param->isVariadic()) {
-                            $parameters = array_merge($parameters, $args);
+                            $parameters = \array_merge($parameters, $args);
                             continue 2;
                         }
                         if ($class !== null
@@ -284,9 +284,10 @@ class Container implements \Psr\Container\ContainerInterface
                 // Also support PHP 7 scalar type hinting -- is_a('string', 'foo') doesn't work so this is a hacky workaround
                 if (!empty($args)) {
                     if ($param->getType()) {
-                        for ($i = 0, $count = count($args); $i < $count; $i++) {
-                            if (call_user_func('is_' . $param->getType(), $args[$i])) {
-                                $parameters[] = array_splice($args, $i, 1)[0];
+                        for ($i = 0, $count = \count($args); $i < $count; $i++) {
+                            if (\call_user_func('is_' . $param->getType(), $args[$i])) {
+                                $parameters[] = \array_splice($args, $i, 1)[0];
+                                break;
                             }
                         }
                         continue;
@@ -314,14 +315,14 @@ class Container implements \Psr\Container\ContainerInterface
     {
         if (!\is_array($param)) {
             // doesn't need any processing
-            return (is_string($param) && $createFromString) ? $this->get($param) : $param;
+            return (\is_string($param) && $createFromString) ? $this->get($param) : $param;
         }
         if (!isset($param[Config::INSTANCE])) {
             if (isset($param[Config::GLOBAL])) {
                 return $GLOBALS[$param[Config::GLOBAL]];
             }
             if (isset($param[Config::CONSTANT])) {
-                return constant($param[Config::CONSTANT]);
+                return \constant($param[Config::CONSTANT]);
             }
             // not a lazy instance, so recursively search for any Config::INSTANCE keys on deeper levels
             foreach ($param as $name => $value) {

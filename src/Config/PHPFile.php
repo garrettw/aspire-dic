@@ -4,13 +4,13 @@ namespace Aspire\DIC\Config;
 
 use Aspire\DIC\Exception\ContainerException;
 
-class PHP implements Format
+class PHPFile implements Format
 {
-    private $path = '';
+    private $path;
 
-    public function __construct($path = '')
+    public function __construct($path)
     {
-        $this->path = $path;
+        $this->path = $path ?: '';
     }
 
     public function load()

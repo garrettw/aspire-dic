@@ -9,6 +9,8 @@ class Config
     const INSTANCE = '::INSTANCE';
     const CHAIN_CALL = '::CHAIN_CALL';
     const SELF = '::SELF';
+    const CLONE = true;
+    const DONT_CLONE = false;
 
     /**
      * @var array $rules Rules which have been set using addRule() or load()
@@ -25,24 +27,22 @@ class Config
     public function load(Config\Format $format)
     {
         $data = $format->load();
-        $config = $this;
+        $config = clone $this;
 
         if (isset($data['rules'])) {
             foreach ($data['rules'] as $rule) {
                 $name = $rule['name'];
                 unset($rule['name']);
-                $config = $config->addRule($name, $rule);
+                $config = $config->addRule($name, $rule, self::DONT_CLONE);
             }
             return $config;
         }
 
         foreach ($data as $name => $rule) {
-            $config = $config->addRule($name, $rule);
+            $config = $config->addRule($name, $rule, self::DONT_CLONE);
         }
         return $config;
     }
-
-    // TODO: only clone instance once when adding multiple rules
 
     /**
      * Adds a rule $rule to the class $classname.
@@ -53,7 +53,7 @@ class Config
      * @param string $id The name of the class to add the rule for
      * @param array $rule The rule to add to it
      */
-    public function addRule(string $id, $rule)
+    public function addRule(string $id, $rule, bool $clone = self::CLONE)
     {
         if (isset($rule['instanceOf'])
             && \is_string($rule['instanceOf'])
@@ -69,7 +69,7 @@ class Config
             }
         }
 
-        $config = clone $this;
+        $config = ($clone) ? clone $this : $this;
         $config->rules[self::normalizeName($id)] = \array_merge_recursive($config->getRule($id), $rule);
 
         return $config;

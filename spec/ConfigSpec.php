@@ -31,8 +31,8 @@ class ConfigSpec extends ObjectBehavior
 
     public function it_default_rule_works()
     {
-        $defaultBehaviour = ['shared' => true];
-        $this->addRule('*', $defaultBehaviour);
+        $defaultBehavior = ['shared' => true];
+        $this->beConstructedWith($defaultBehavior);
 
         $this->getRule('\spec\Aspire\DIC\A')['shared']->shouldBe(true);
     }
@@ -40,7 +40,7 @@ class ConfigSpec extends ObjectBehavior
     public function it_namespaces_rules()
     {
         $rule = [];
-        $this->addRule('spec\Aspire\DIC\B', $rule);
+        $this->addRule('spec\Aspire\DIC\B', $rule, false);
 
         $this->getRule('spec\Aspire\DIC\B')->shouldEqual($this->getRule('*'));
     }
