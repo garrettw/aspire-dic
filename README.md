@@ -28,7 +28,9 @@ This is a list of the features I have decided I want to be in this.
 * Able to perform auto-wiring on any PHP callable (AmPHP)
 * Configure container using a separate object, pursuant to SRP
 * A way to find the correct classnames based on applying a formula to interface names
-* A way for modular code to provide rules/definitions to the container with a common interface
+* A way for modular code to provide rules/definitions to the container with a common interface (such as Joomla's service providers)
+* Child containers for managing resolution scope (Joomla); children can selectively override definitions without affecting parent's definitions
 
 ## Undesired features
 * explicit setter injection
+* A self-binding global container instance (Cobalt)
