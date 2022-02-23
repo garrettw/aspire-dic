@@ -24,8 +24,13 @@
     },
     "autoload": {
         "psr-4": {
-            "Aspire\\DIC\\": "src/",
+            "Aspire\\Di\\": "src/",
             "": "vendor/"
+        }
+    },
+    "config": {
+        "allow-plugins": {
+            "symfony/flex": true
         }
     }
 }

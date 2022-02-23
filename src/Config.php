@@ -1,88 +1,65 @@
 <?php
 
-namespace Aspire\DIC;
+namespace Aspire\Di;
 
 class Config
 {
-    const CONSTANT = '::CONSTANT';
-    const GLOBAL = '::GLOBAL';
-    const INSTANCE = '::INSTANCE';
-    const CHAIN_CALL = '::CHAIN_CALL';
-    const SELF = '::SELF';
-    const CLONE = true;
-    const DONT_CLONE = false;
+    /** @var RuleProvider[] */
+    protected $ruleProviders;
 
-    /**
-     * @var array $rules Rules which have been set using addRule() or load()
-     */
-    private $rules = [];
+    /** @var bool */
+    protected $autowiring;
 
-    public function __construct($defaultRule = [])
+    /** @var Rule[] */
+    protected $rules = [];
+
+    public function __construct(array $ruleProviders = [], bool $autowiring = true)
     {
-        if (!empty($defaultRule)) {
-            $this->rules['*'] = $defaultRule;
-        }
-    }
-
-    public function load(Config\Format $format)
-    {
-        $data = $format->load();
-        $config = clone $this;
-
-        if (isset($data['rules'])) {
-            foreach ($data['rules'] as $rule) {
-                $name = $rule['name'];
-                unset($rule['name']);
-                $config = $config->addRule($name, $rule, self::DONT_CLONE);
-            }
-            return $config;
-        }
-
-        foreach ($data as $name => $rule) {
-            $config = $config->addRule($name, $rule, self::DONT_CLONE);
-        }
-        return $config;
+        $this->ruleProviders = $ruleProviders;
+        $this->autowiring = $autowiring;
     }
 
     /**
-     * Adds a rule $rule to the class $classname.
+     * Fetch rules from all registered providers, checking for collisions
      *
-     * The container can be fully configured using rules provided by associative arrays.
-     * See {@link https://r.je/dice.html#example3} for a description of the rules.
-     *
-     * @param string $id The name of the class to add the rule for
-     * @param array $rule The rule to add to it
+     * @return Config
+     * @throws Exception\ContainerException on invalid providers/rules or rule collisions
      */
-    public function addRule(string $id, $rule, bool $clone = self::CLONE)
+    public function load()
     {
-        if (isset($rule['instanceOf'])
-            && \is_string($rule['instanceOf'])
-            && (!\array_key_exists('inherit', $rule) || $rule['inherit'] === true)
-        ) {
-            $rule = \array_merge_recursive($this->getRule($rule['instanceOf']), $rule);
-        }
+        foreach ($this->ruleProviders as $provider) {
+            $class = \get_class($provider);
+            if (!($provider instanceof RuleProvider)) {
+                throw new Exception\ContainerException("Invalid rule provider: instance of $class");
+            }
 
-        // Allow substitutions rules to be defined with a leading slash
-        if (isset($rule['substitutions'])) {
-            foreach($rule['substitutions'] as $key => $value) {
-                $rule['substitutions'][ltrim($key, '\\')] = $value;
+            foreach ($provider->rules() as $rule) {
+                $ruleId = static::isRegex($rule->id)
+                    ? $rule->id // don't touch it
+                    : static::normalizeName($rule->id);
+
+                if (isset($this->rules[$ruleId])) {
+                    throw new Exception\ContainerException("Rule collision in $class: $ruleId is already defined");
+                }
+                $this->rules[$ruleId] = $rule;
             }
         }
 
-        $config = ($clone) ? clone $this : $this;
-        $config->rules[self::normalizeName($id)] = \array_merge_recursive($config->getRule($id), $rule);
-
-        return $config;
+        return $this;
     }
 
     /**
      * Returns the rule that will be applied to the class $id during make().
      *
      * @param string $id The name of the ruleset to get - can be a class or not
-     * @return array Ruleset that applies when instantiating the given name
+     * @return array|Rule Rule that applies when instantiating the given name
      */
     public function getRule(string $id)
     {
+        if (!$this->rules) {
+            $this->load();
+        }
+
         // first, check for exact match
         $normalname = self::normalizeName($id);
         if (isset($this->rules[$normalname])) {
@@ -90,12 +67,19 @@ class Config
         }
         // next, look for a rule where:
         foreach ($this->rules as $key => $rule) {
-            if ($key !== '*'                    // it's not the default rule,
-                && \is_subclass_of($id, $key) // its name is a parent class of what we're looking for,
-                && empty($rule['instanceOf'])   // it's not a named instance,
-                && (!array_key_exists('inherit', $rule) || $rule['inherit'] === true) // and it applies to subclasses
+            $matches = [];
+            if ($key !== '*' // it's not the default rule,
+                && (
+                    ( // its name is a parent class of what we're looking for,
+                        \is_subclass_of($id, $key)
+                        // and it applies to subclasses
+                        && (!isset($rule->inherit) || $rule->inherit === true)
+                    )
+                    // or the id is a matching regex
+                    || (static::isRegex($key) && \preg_match($key, $id, $matches))
+                )
             ) {
-                return $rule;
+                return $matches ? ['rule' => $rule, 'matches' => $matches] : $rule;
             }
         }
         // if we get here, return the default rule if it's set
@@ -104,9 +88,19 @@ class Config
 
     /**
      * @param string $name
+     * @return string lowercased classname without leading backslash
      */
-    private static function normalizeName(string $name)
+    protected static function normalizeName(string $name): string
     {
         return \strtolower(\ltrim($name, '\\'));
+    }
+
+    /**
+     * @param string $name
+     * @return bool
+     */
+    protected static function isRegex(string $name): bool
+    {
+        return ($name[0] === '/' && $name[-1] === '/');
     }
 }
