@@ -2,12 +2,7 @@
 
 namespace Aspire\Di;
 
-abstract class RuleProvider
+interface RuleProvider
 {
-    public abstract static function load();
-
-    public function rules()
-    {
-        return $this->rules;
-    }
+    public function rules();
 }
